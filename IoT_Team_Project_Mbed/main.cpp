@@ -24,20 +24,20 @@ double SENSOR_READ_TERM = 0.5;
 bool isRead = false;
 
 void readSensor() { isRead = true;} 
-void sendIntegerData(int value){ for(int i = 0; i < sizeof(int); i++)    pc.printf("%c", *(((char *) &value) + i)); }
+void sendIntegerData(int value){ pc.printf("%d\r\n", value); }
 
 /* Send the Sensor Data using RX-TX */
 void sendSensorData(){
-    pc.printf("%c", STX);                               // Send the STX
+    pc.printf("%c\r\n", STX);                               // Send the STX
     sendIntegerData(LIGHT_SENSOR.read_u16());           // Send the Light Data
-    pc.printf("%c", IDLE);    
+    pc.printf("%c\r\n", IDLE);    
     sendIntegerData(IR_SENSOR.read_u16());              // Send the IR Data
-    pc.printf("%c", IDLE);                              
+    pc.printf("%c\r\n", IDLE);                              
     TEMP_SEONSOR.read();
     sendIntegerData(TEMP_SEONSOR.getHumidity());        // Send the Humidity Data
-    pc.printf("%c", IDLE);                              
+    pc.printf("%c\r\n", IDLE);                              
     sendIntegerData(TEMP_SEONSOR.getCelsius());         // Send the Celsius Data
-    pc.printf("%c", ETX);                               // Send the ETX
+    pc.printf("%c\r\n", ETX);                               // Send the ETX
 }
 
 int main()
