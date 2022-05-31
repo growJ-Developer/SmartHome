@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 
 
 public class IoTController : MonoBehaviour {
-    SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
+    SerialPort sp = new SerialPort("/dev/tty.usbmodem1203", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
     //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                      // Open Serial Port(Windows)
     
     public static byte[] buffer = new byte[sizeof(int)];                // Byte Array for receive Serial Data
