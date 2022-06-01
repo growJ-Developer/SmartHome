@@ -16,16 +16,13 @@ using System.Threading;
 
 public class IoTController : MonoBehaviour {
     public Thread spThread;
-    SerialPort sp = new SerialPort("/dev/tty.usbmodem1203", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
+    SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
     //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                      // Open Serial Port(Windows)
-    
-    public static byte[] buffer = new byte[sizeof(int)];                            // Byte Array for receive Serial Data
-    public static int bufferSize = sizeof(int);
-    public static int bufferIndex = 0;
-    public static byte STX = (byte) 0x02;                                           // STX byte data
-    public static byte ETX = (byte) 0x03;                                           // ETX byte data
-    public static byte IDLE = (byte) 0x01;                                          // IDLE byte data
-    public static int receiveIndex = 0;                                             // Receive Index
+
+    public static byte STX = 0x02;                                           // STX byte data
+    public static byte DLE = 0x01;                                           // DLE byte data
+    public static byte ETX = 0x03;                                       // ETX byte data
+    public static int receiveIndex = 0;                                      // Receive Index
 
     /* Sensor Data */
     public static int lightValue = 0;
@@ -33,85 +30,50 @@ public class IoTController : MonoBehaviour {
     public static int humidityValue = 0;
     public static int celsiusValue = 0; 
     
+    /* Protocol for send data */
+    public enum Devices : byte {TV = 0x21, SPEAKER = 0x22}
+    public enum Functions : byte {FUNC1 = 0x41, FUNC2 = 0x42}
+    public enum Instructions : byte {INST1 = 0x61, INST2 = 0x62}
 
     void Start() {
-        sp.Open();                              // Open the Serial Port
-        sp.ReadTimeout = 500;
-
-        foreach(string str in SerialPort.GetPortNames()){
-            //Debug.Log(string.Format("Existing COM port : {0}", str));
-        }
-
-        // Create the thread for Serial Data Receive
-        spThread = new Thread(spDataReceived);
-        spThread.Start();
+        sp.Open();                                                          // Open the Serial Port
+        sp.ReadTimeout = 100;
     }
 
     // Update is called once per frame
     void Update() {
-        
-    }
+        getReceiveData();                                                  // Gat data from SerialPort
 
-    public static int getReceiveData(){
-        int readValue = 0;
-
-        for(int i = 0; i < bufferIndex; i++){
-            
-            readValue = (int) ((readValue << 8) & buffer[i]);
+        // Control Device Section
+        if(Input.GetKey(KeyCode.Q)) {
+            Debug.Log("Q");
+            sendDataToMBed((byte)Devices.TV, (byte)Functions.FUNC1, (byte)Instructions.INST1);
         }
-
-        return readValue;
+        if(Input.GetKey(KeyCode.W)) {
+            Debug.Log("W");
+            sendDataToMBed((byte)Devices.SPEAKER, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+        }
     }
 
-    public void spDataReceived(){
-        while(true){
-            try{
-                byte message = (byte) sp.ReadChar();
-                //Debug.Log(string.Format("STX Format : {0}", STX));
-                //Debug.Log(string.Format("Existing Message from SerialPort : {0}", message));
+    // Send data to Mbed
+    void sendDataToMBed(byte Device, byte Function, byte Command){
+        // Processing the send data
+        byte[] Protocol = {STX, Device, DLE, Function, DLE, Command, ETX};
+        // Send data to MBed (STX-ETX Format)
+        sp.Write(Protocol, 0, Protocol.Length);              // Send the Protocol Data
+    }
 
-                if(message == STX){
-                    // Clear the received Data
-                    receiveIndex = 0;
-                    buffer = new byte[bufferSize];
-                    bufferIndex = 0;
-                } else if((message == IDLE) || (message == ETX)){
-                    // Finish the receive sensor data (only one sensor)
-                    int receiveData = getReceiveData();
+    // Get data from SerialPort
+    void getReceiveData(){
+        try{
+            string[] readData = sp.ReadLine().Split(",");
 
-                    //Debug.Log(string.Format("ReceivedData : {0}", receiveData));
+            lightValue = int.Parse(readData[0]);
+            irValue = int.Parse(readData[1]);
+            humidityValue = int.Parse(readData[2]);
+            celsiusValue = int.Parse(readData[3]);
+        } catch(System.TimeoutException){
 
-                    /*
-                    if(receiveIndex == 0)           lightValue = receiveData;
-                    else if(receiveData == 1)       irValue = receiveData;
-                    else if(receiveData == 2)       humidityValue = receiveData;
-                    else if(receiveData == 3)       celsiusValue = receiveData;
-                    */
-
-                    // Clear the buffer
-                    buffer = new byte[bufferSize];
-                    bufferIndex = 0;
-
-                    receiveIndex++;
-                } else{
-                    
-                    buffer[bufferIndex] = message;
-                    Debug.Log(string.Format("ReceivedData : {0}", buffer[bufferIndex]));
-                    bufferIndex = (bufferIndex + 1) % bufferSize;
-                }
-
-            } catch(System.TimeoutException e){                     // Error for Serial Timeout
-                print(e);
-                sp.Close();
-                spThread.Abort();
-                throw;
-            } catch(System.InvalidOperationException e){            // Error for closed Serial Port
-                print(e);
-                spThread.Abort();
-                throw;
-            } catch(System.Exception e){                            // Exception for don't have receiveData
-                print(e);
-            } 
         }
     }
 
