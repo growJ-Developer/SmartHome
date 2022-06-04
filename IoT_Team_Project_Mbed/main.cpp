@@ -5,6 +5,8 @@
 #include "platform/mbed_thread.h"
 #include "TextLCD.h"
 #include <string>
+#include <Servo.h>
+
 
 #define LCD_ADDRESS_LCD 0x4E // change this according to ur setup
 
@@ -16,7 +18,8 @@ AnalogIn IR_SENSOR(A1);
 Dht11 TEMP_SEONSOR(A2);
 I2C i2c_lcd(D14, D15);
 TextLCD_I2C lcd(&i2c_lcd, LCD_ADDRESS_LCD, TextLCD::LCD16x2);
-
+Servo blind(D2);
+DigitalOut light(D4); 
 Timer timer;
 Ticker flipper;
 
@@ -31,7 +34,7 @@ double SENSOR_READ_TERM = 0.02;                         // Set Hz(50Hz = 20ms)
 bool isRead = false;
 bool isSend = true;
 
-int writeValue = 0;
+int lightValue = 0;
 int irValue = 0;
 int humidityValue = 0;
 int celsiusValue = 0;
@@ -41,6 +44,9 @@ void readSensor() { isRead = true;}
 void sendSensorData();
 void receiveData();
 void controlDevice(char Device, char Function, char Instruction);
+void controlBlind(char Function, char Instruction);
+void controlLight(char Function, char Instruction);
+void checkSensorData();
 
 char buffer[128];
 int bufferIndex = 0;
@@ -48,7 +54,7 @@ int bufferIndex = 0;
 int main()
 {    
     lcd.setBacklight(TextLCD::LightOn);
-    flipper.attach(&readSensor, SENSOR_READ_TERM);
+    //flipper.attach(&checkSensorData, SENSOR_READ_TERM);
 
     while (true) {
         char data = pc.getc();
@@ -100,7 +106,31 @@ void controlDevice(char Device, char Function, char Instruction){
                 lcd.printf("UP");
             }
         }
-    } 
+    } else if(Device == 0x25) {
+        controlBlind(Function, Instruction);
+    } else if(Device == 0x26){
+        controlLight(Function,  Instruction);
+    }
 
     /* Call the Control Device Function */
+}
+
+void controlBlind(char Function, char Instruction){
+    if(Function == 0x41){
+        if(Instruction == 0x61){
+            blind.write(180);
+        } else if(Instruction == 0x62){
+            blind.write(0);
+        }
+    }
+}
+
+void controlLight(char Function, char Instruction){
+    if(Function == 0x41){
+        if(Instruction == 0x61){
+            light = 1;
+        } else if(Instruction == 0x62){
+            light = 0;
+        }
+    }
 }

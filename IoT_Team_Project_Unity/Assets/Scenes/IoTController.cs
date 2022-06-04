@@ -16,8 +16,8 @@ using System.Threading;
 
 public class IoTController : MonoBehaviour {
     public Thread spThread;
-    SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
-    //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                    // Open Serial Port(Windows)
+    //SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
+    SerialPort sp = new SerialPort("COM12", 115200, Parity.None, 8, StopBits.None);                    // Open Serial Port(Windows)
 
     public static byte STX = 0x02;                                           // STX byte data
     public static byte DLE = 0x01;                                           // DLE byte data
@@ -39,10 +39,12 @@ public class IoTController : MonoBehaviour {
     public static int celsiusValue = 0; 
 
     /* Protocol for send data */
-    public enum Devices : byte {TV = 0x21, SPEAKER = 0x22}
+    public enum Devices : byte {TV = 0x21, SPEAKER = 0x22, BLIND = 0x25, LIGHT = 0x26}
     public enum Functions : byte {FUNC1 = 0x41, FUNC2 = 0x42}
     public enum Instructions : byte {INST1 = 0x61, INST2 = 0x62}
 
+    public static bool blindAuto = true;
+    public static bool lightAuto = true;
     void Start() {
         sp.Open();                                                          // Open the Serial Port
         sp.ReadTimeout = 50;
@@ -66,10 +68,79 @@ public class IoTController : MonoBehaviour {
         }
 
         if(Input.GetKey(KeyCode.E)) {
-            Debug.Log("W");
+            Debug.Log("E");
             requestSensorData();
         }
+
+        if (Input.GetKey(KeyCode.Z))
+        {
+            blindAuto = false;
+            Debug.Log("Z");
+            sendDataToMBed((byte)Devices.BLIND, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+        }
+        if (Input.GetKey(KeyCode.X))
+        {
+            blindAuto = false;
+            Debug.Log("X");
+            sendDataToMBed((byte)Devices.BLIND, (byte)Functions.FUNC1, (byte)Instructions.INST2);
+        }
+        if (Input.GetKey(KeyCode.C))
+        {
+            blindAuto = !blindAuto;
+            Debug.Log("C");
+        }
+
+        if (blindAuto)
+        {
+            autoBlindAction();
+        }
+        if (Input.GetKey(KeyCode.V))
+        {
+            lightAuto = false;
+            Debug.Log("V");
+            sendDataToMBed((byte)Devices.LIGHT, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+        }
+        if (Input.GetKey(KeyCode.B))
+        {
+            lightAuto = false;
+            Debug.Log("B");
+            sendDataToMBed((byte)Devices.LIGHT, (byte)Functions.FUNC1, (byte)Instructions.INST2);
+        }
+        if (Input.GetKey(KeyCode.N))
+        {
+            lightAuto = !lightAuto;
+            Debug.Log("N");
+        }
+        if (lightAuto)
+        {
+            autoLightAction();
+        }
     }
+
+    void autoBlindAction()
+    {
+        if(lightValue > 50000)
+        {
+            sendDataToMBed((byte)Devices.BLIND, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+        }
+        else
+        {
+            sendDataToMBed((byte)Devices.BLIND, (byte)Functions.FUNC1, (byte)Instructions.INST2);
+        }
+    }
+
+    void autoLightAction()
+    {
+        if (lightValue > 50000)
+        {
+            sendDataToMBed((byte)Devices.LIGHT, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+        }
+        else
+        {
+            sendDataToMBed((byte)Devices.LIGHT, (byte)Functions.FUNC1, (byte)Instructions.INST2);
+        }
+    }
+
 
     // Buffer Action for buffer Thread
     void bufferAction(){
@@ -116,7 +187,7 @@ public class IoTController : MonoBehaviour {
         // If, Request the Sensor Data
         if(isReqSensor){
             try{
-                Thread.Sleep(500);
+                //Thread.Sleep(500);
                 string[] readData = sp.ReadLine().Split(",");
                 lightValue = int.Parse(readData[0]);
                 irValue = int.Parse(readData[1]);
@@ -125,6 +196,8 @@ public class IoTController : MonoBehaviour {
 
                 // If successful get sensor data, change thr isReqSensor to False
                 isReqSensor = false;
+                bufferIndex = (bufferIndex + 1) % bufferSize;
+                Debug.Log(string.Format("Light : {0}", lightValue));
                 Debug.Log("Success the get sensor data.");
             } catch(System.TimeoutException e){
                 // If, Don't have Received Data
