@@ -68,10 +68,21 @@
 //LCD and serial portexpanders should be wired according to the tables below.
 //
 //Select Serial Port Expander Hardware module (one option only)
-#define DEFAULT        1
+//#define DEFAULT        1
+//#define ADAFRUIT       0
+//#define DFROBOT        0
+//#define LCM1602        0
+//#define YWROBOT        0
+//#define GYLCD          0
+//#define MJKDZ          0
+//#define SYDZ           0
+//#define WIDEHK         0
+//#define LCDPLUG        0
+
+#define DEFAULT        0
 #define ADAFRUIT       0
 #define DFROBOT        0
-#define LCM1602        0
+#define LCM1602        1
 #define YWROBOT        0
 #define GYLCD          0
 #define MJKDZ          0

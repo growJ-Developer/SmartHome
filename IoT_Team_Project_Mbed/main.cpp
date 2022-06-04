@@ -1,93 +1,93 @@
-#include "I2C.h"
-#include "TextLCD.h"
 #include "Dht11.h"
+#include "DigitalOut.h"
+#include "Serial.h"
 #include "mbed.h"
 #include "platform/mbed_thread.h"
+#include "TextLCD.h"
+#include <string>
+
+#define LCD_ADDRESS_LCD 0x4E // change this according to ur setup
+
+DigitalOut led1(LED1);
+DigitalOut led2(LED2);
 
 AnalogIn LIGHT_SENSOR(A0);
 AnalogIn IR_SENSOR(A1);
 Dht11 TEMP_SEONSOR(A2);
-
-I2C i2c(D14, D15);
-TextLCD_I2C lcd(&i2c, 0x4E, TextLCD::LCD16x2);
+I2C i2c_lcd(D14, D15);
+TextLCD_I2C lcd(&i2c_lcd, LCD_ADDRESS_LCD, TextLCD::LCD16x2);
 
 Timer timer;
 Ticker flipper;
 
-//Serial pc(SERIAL_TX, SERIAL_RX, 115200);
 Serial pc(USBTX, USBRX, 115200);
 
 const char STX = 0x02;
-const char ETX = 0x03;
 const char DLE = 0x01;
+const char ETX = 0x03;
 
 double SENSOR_READ_TERM = 0.5;                         // Set Hz(50Hz = 20ms)
 bool isRead = false;
+bool isSend = true;
 
 void readSensor() { isRead = true;} 
+void sendSensorData();
+void receiveData();
+void controlDevice(char Device, char Function, char Instruction);
+
+char buffer[128];
+int bufferIndex = 0;
+
+int main()
+{    
+    lcd.setBacklight(TextLCD::LightOn);
+    //flipper.attach(&readSensor, SENSOR_READ_TERM);
+
+    while (true) {
+        char data = pc.getc();
+
+        if(data == STX){
+            memset(buffer, 0, sizeof(buffer));
+            bufferIndex = 0;
+        } else if(data == ETX){
+            controlDevice(buffer[0], buffer[1], buffer[2]);
+        } else if(data == DLE){
+            bufferIndex++;
+        } else {
+            buffer[bufferIndex] = data;     
+        }        
+    }
+}
 
 /* Send the Sensor Data using RX-TX */
 void sendSensorData(){
-    TEMP_SEONSOR.read();
-    if(pc.writeable())      pc.printf("%d,%d,%d,%d\r\n", LIGHT_SENSOR.read_u16(), IR_SENSOR.read_u16(), TEMP_SEONSOR.getHumidity(), TEMP_SEONSOR.getCelsius());
-    isRead = true;
-}
-
-// Test LED
-Thread tThread;
-int led_interval = 1000;
-bool flag = false;
-void led_thread(){
-    DigitalOut led(LED1);
-    while(true){
-        led = flag;
-        flag = !flag;
-        wait_ms(led_interval);
+    if(isSend && pc.writeable()){
+        TEMP_SEONSOR.read();
+        //pc.printf("%d,%d,%d,%d\r\n", LIGHT_SENSOR.read_u16(), IR_SENSOR.read_u16(), TEMP_SEONSOR.getHumidity(), TEMP_SEONSOR.getCelsius());
     }
 }
 
-/* Control the Device base of Recieved Data */
+/* Control the Device From Serial Data */
 void controlDevice(char Device, char Function, char Instruction){
-    // Compare Error...
-    if(Device == (char) 0x21){
-        led_interval = 100;
-    } else if(Device == (char) 0x22){
-        led_interval = 50;
-    }
-}
-
-int main()
-{
-    // LCD Error...
     lcd.cls();
-    lcd.setBacklight(TextLCD::LightOn);
-    //lcd.printf("LCD Hello\n\r");
 
-    flipper.attach(&readSensor, SENSOR_READ_TERM);
-
-    tThread.start(led_thread);   
-
-    int readIndex = 0;
-    char recievedData[3] = {0x00, 0x00, 0x00};
-
-    while (true) {
-        lcd.printf("LCD Hello\n\r");
-
-
-        if(pc.readable()){
-            char byte = pc.getc();   
-
-            if(byte == STX)         readIndex = 0;
-            else if(byte == ETX)    controlDevice(recievedData[0], recievedData[1], recievedData[2]);
-            else if(byte == DLE)    readIndex = readIndex + 1;
-            else                    recievedData[readIndex] = (char) byte;
+    if(Device == 0x21) {
+        lcd.printf("TV, ");
+        if(Function == 0x41){
+            lcd.printf("POWER, ");
+            if(Instruction == 0x61){
+                lcd.printf("ON");
+            }
         }
-
-        /* If read the sensor data, send to other device */
-        if(isRead){
-            sendSensorData();
-            isRead = false;
+    } else if(Device == 0x22) {
+        lcd.printf("SPEAKER, ");
+        if(Function == 0x42){
+            lcd.printf("VOLUME, ");
+            if(Instruction == 0x62){
+                lcd.printf("UP");
+            }
         }
-    }
+    } 
+
+    /* Call the Control Device Function */
 }
-
