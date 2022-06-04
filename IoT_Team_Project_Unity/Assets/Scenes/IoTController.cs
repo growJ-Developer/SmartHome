@@ -22,14 +22,22 @@ public class IoTController : MonoBehaviour {
     public static byte STX = 0x02;                                           // STX byte data
     public static byte DLE = 0x01;                                           // DLE byte data
     public static byte ETX = 0x03;                                           // ETX byte data
+    public static byte ACK = 0x06;                                           // ACK byte data
     public static int receiveIndex = 0;                                      // Receive Index
+
+    public static bool isReqSensor = false;
+    public static int bufferSize = 255;
+    public static byte[] buffer = new byte[bufferSize];
+    public static int bufferIndex = 0;
+    public static int outIndex = 0;
+    public static Thread bufferThread;
 
     /* Sensor Data */
     public static int lightValue = 0;
     public static int irValue = 0;
     public static int humidityValue = 0;
     public static int celsiusValue = 0; 
-    
+
     /* Protocol for send data */
     public enum Devices : byte {TV = 0x21, SPEAKER = 0x22}
     public enum Functions : byte {FUNC1 = 0x41, FUNC2 = 0x42}
@@ -38,13 +46,15 @@ public class IoTController : MonoBehaviour {
     void Start() {
         sp.Open();                                                          // Open the Serial Port
         sp.ReadTimeout = 50;
-        sp.WriteTimeout = 500;
+        sp.WriteTimeout = 50;
+
+        bufferThread = new Thread(new ThreadStart(bufferAction));
+        bufferThread.Start();
     }
 
     // Update is called once per frame
     void Update() {
-        //getReceiveData();                                                  // Gat data from SerialPort
-
+        
         // Control Device Section
         if(Input.GetKey(KeyCode.Q)) {
             Debug.Log("Q");
@@ -54,27 +64,71 @@ public class IoTController : MonoBehaviour {
             Debug.Log("W");
             sendDataToMBed((byte)Devices.SPEAKER, (byte)Functions.FUNC2, (byte)Instructions.INST2);
         }
+
+        if(Input.GetKey(KeyCode.E)) {
+            Debug.Log("W");
+            requestSensorData();
+        }
+    }
+
+    // Buffer Action for buffer Thread
+    void bufferAction(){
+        while(true){
+            if(isReqSensor){
+                // Sensor Request Action
+                getReceiveData();
+            } else if(bufferIndex != outIndex){
+                // If SensorRequest Byte, Waiting to ReadSensor
+                if(buffer[outIndex] == ACK)     isReqSensor = true;
+                // Send the Buffer Data 1Byte
+                sp.Write(buffer, outIndex, 1);
+                outIndex = (outIndex + 1) % bufferSize;
+            }
+        }
+        
+    }
+
+    // Request the Sensor Data
+    void requestSensorData(){
+        // Send request signal to Mbed
+        writeToBuffer(ACK);
     }
 
     // Send data to Mbed
     void sendDataToMBed(byte Device, byte Function, byte Command){
-        byte[] sendProtocol = {STX, Device, DLE, Function, DLE, Command, ETX};
-        sp.Write(sendProtocol, 0, sendProtocol.Length);
+        writeToBuffer(STX);
+        writeToBuffer(Device);
+        writeToBuffer(DLE);
+        writeToBuffer(Function);
+        writeToBuffer(DLE);
+        writeToBuffer(Command);
+        writeToBuffer(ETX);
+    }
+
+    // Write to Buffer for Sending Data
+    void writeToBuffer(byte data){
+        buffer[bufferIndex] = data;
+        bufferIndex = (bufferIndex + 1) % bufferSize;
     }
 
     // Get data from SerialPort
     void getReceiveData(){
-        try{
-            string msg = sp.ReadLine();
-            string[] readData = msg.Split(",");
+        // If, Request the Sensor Data
+        if(isReqSensor){
+            try{
+                Thread.Sleep(500);
+                string[] readData = sp.ReadLine().Split(",");
+                lightValue = int.Parse(readData[0]);
+                irValue = int.Parse(readData[1]);
+                humidityValue = int.Parse(readData[2]);
+                celsiusValue = int.Parse(readData[3]);
 
-            lightValue = int.Parse(readData[0]);
-            irValue = int.Parse(readData[1]);
-            humidityValue = int.Parse(readData[2]);
-            celsiusValue = int.Parse(readData[3]);
-            Debug.Log(string.Format("Received Data : {0}", msg));
-        } catch(System.TimeoutException){
-
+                // If successful get sensor data, change thr isReqSensor to False
+                isReqSensor = false;
+                Debug.Log("Success the get sensor data.");
+            } catch(System.TimeoutException e){
+                // If, Don't have Received Data
+            }
         }
     }
 
@@ -83,6 +137,7 @@ public class IoTController : MonoBehaviour {
             try{
 
             } catch(System.Exception e){
+                bufferThread.Abort();
                 print(e);
                 sp.Close();
                 throw;
