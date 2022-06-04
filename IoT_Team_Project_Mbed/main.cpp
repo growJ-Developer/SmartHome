@@ -1,5 +1,6 @@
 #include "Dht11.h"
 #include "DigitalOut.h"
+#include "PinNames.h"
 #include "Serial.h"
 #include "mbed.h"
 #include "platform/mbed_thread.h"
@@ -8,8 +9,12 @@
 
 #define LCD_ADDRESS_LCD 0x4E // change this according to ur setup
 
-DigitalOut led1(LED1);
-DigitalOut led2(LED2);
+
+PwmOut LedR(D3);
+PwmOut LedG(D5);
+PwmOut LedB(D6);
+DigitalOut rgb1(D7);
+DigitalOut rgb2(D8);
 
 AnalogIn LIGHT_SENSOR(A0);
 AnalogIn IR_SENSOR(A1);
@@ -36,6 +41,10 @@ int irValue = 0;
 int humidityValue = 0;
 int celsiusValue = 0;
 
+int tempLevel = 3;
+bool acAuto = false;
+float ledRed = 0.5;
+float ledBlue = 0.5;
 
 void readSensor() { isRead = true;} 
 void sendSensorData();
@@ -44,6 +53,7 @@ void controlDevice(char Device, char Function, char Instruction);
 
 char buffer[128];
 int bufferIndex = 0;
+void checkSensorData();
 
 int main()
 {    
@@ -66,7 +76,8 @@ int main()
             bufferIndex++;
         } else {
             buffer[bufferIndex] = data;     
-        }        
+        }      
+
     }
 }
 
@@ -80,6 +91,11 @@ void sendSensorData(){
     pc.printf("%d,%d,%d,%d\r\n", LIGHT_SENSOR.read_u16(), IR_SENSOR.read_u16(), TEMP_SEONSOR.getHumidity(), TEMP_SEONSOR.getCelsius());
 }
 
+/* LED RGB Control 
+void rgbControl::wirte(float red, float green, float blue){
+    LedR = red;
+}*/
+
 /* Control the Device From Serial Data */
 void controlDevice(char Device, char Function, char Instruction){
     lcd.cls();
@@ -89,6 +105,7 @@ void controlDevice(char Device, char Function, char Instruction){
         if(Function == 0x41){
             lcd.printf("POWER, ");
             if(Instruction == 0x61){
+                
                 lcd.printf("ON");
             }
         }
@@ -100,7 +117,76 @@ void controlDevice(char Device, char Function, char Instruction){
                 lcd.printf("UP");
             }
         }
-    } 
+    } else if(Device == 0x23) {
+        if(Function == 0x43){
+            LedR.write(0.5);
+            LedB.write(0.5);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            rgb1.write(0);
+            rgb2.write(1);
+            //LED 1 ON
+  
+        } else if(Function == 0x44) {
+            LedR.write(0.5);
+            LedB.write(0.5);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            rgb1.write(0);
+            rgb2.write(0);
+            //LED 1 and LED 2 ON
+        }
+    } else if(Device == 0x24) {
+        if(Function == 0x43) {
+            if(tempLevel > 1){
+                ledRed -= 0.25;
+                ledBlue += 0.25;
+                tempLevel--;
+            }
+            LedR.write(ledRed);
+            LedB.write(ledBlue);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            //LED 1 and LED 2 == BLUE
+        } else if(Function == 0x44) {
+            if(tempLevel < 5){
+                ledRed += 0.25;
+                ledBlue -= 0.25;
+                tempLevel++;
+            }
+            LedR.write(ledRed);
+            LedB.write(ledBlue);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            //LED1 and LED 2 == RED
+        } else if(Function == 0x42) {
+            if(Instruction == 0x62) {
+                if(tempLevel > 1){
+                ledRed -= 0.25;
+                ledBlue += 0.25;
+                tempLevel--;
+            }
+            LedR.write(ledRed);
+            LedB.write(ledBlue);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            }
+            else if(Instruction == 0x63) {
+                if(tempLevel < 5){
+                ledRed += 0.25;
+                ledBlue -= 0.25;
+                tempLevel++;
+            }
+            LedR.write(ledRed);
+            LedB.write(ledBlue);
+            LedR.period(0.005);
+            LedB.period(0.005);
+            }
+        }
+    }
 
     /* Call the Control Device Function */
+
+    
+    
 }

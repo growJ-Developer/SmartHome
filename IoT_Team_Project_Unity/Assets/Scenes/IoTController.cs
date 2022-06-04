@@ -16,7 +16,7 @@ using System.Threading;
 
 public class IoTController : MonoBehaviour {
     public Thread spThread;
-    SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
+    SerialPort sp = new SerialPort("/dev/tty.usbmodem11103", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
     //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                    // Open Serial Port(Windows)
 
     public static byte STX = 0x02;                                           // STX byte data
@@ -39,9 +39,11 @@ public class IoTController : MonoBehaviour {
     public static int celsiusValue = 0; 
 
     /* Protocol for send data */
-    public enum Devices : byte {TV = 0x21, SPEAKER = 0x22}
-    public enum Functions : byte {FUNC1 = 0x41, FUNC2 = 0x42}
-    public enum Instructions : byte {INST1 = 0x61, INST2 = 0x62}
+    public enum Devices : byte {TV = 0x21, SPEAKER = 0x22, ACPower = 0x23, ACTemp = 0x24}
+    public enum Functions : byte {FUNC1 = 0x41, FUNC2 = 0x42, FUNC3 = 0x43, FUNC4 = 0x44}
+    public enum Instructions : byte {INST1 = 0x61, INST2 = 0x62, INST3 = 0x63}
+
+    public static bool acAuto = false;
 
     void Start() {
         sp.Open();                                                          // Open the Serial Port
@@ -66,9 +68,45 @@ public class IoTController : MonoBehaviour {
         }
 
         if(Input.GetKey(KeyCode.E)) {
-            Debug.Log("W");
+            Debug.Log("E");
             requestSensorData();
         }
+
+        if(Input.GetKey(KeyCode.A)) {
+            Debug.Log("A");
+            acAuto = false;
+            sendDataToMBed((byte)Devices.ACPower, (byte)Functions.FUNC3, (byte)Instructions.INST1);
+        }
+
+        if(Input.GetKey(KeyCode.S)) {
+            Debug.Log("S");
+            acAuto = false;
+            sendDataToMBed((byte)Devices.ACPower, (byte)Functions.FUNC4, (byte)Instructions.INST1);
+        }
+
+        if(Input.GetKey(KeyCode.D)) {
+            Debug.Log("D");
+            acAuto = false;
+            sendDataToMBed((byte)Devices.ACTemp, (byte)Functions.FUNC3, (byte)Instructions.INST1);
+        }
+
+        if(Input.GetKey(KeyCode.F)) {
+            Debug.Log("F");
+            acAuto = false;
+            sendDataToMBed((byte)Devices.ACTemp, (byte)Functions.FUNC4, (byte)Instructions.INST1);
+        }
+
+        if(Input.GetKey(KeyCode.G)) {
+            Debug.Log("G");
+            acAuto = !acAuto;
+        }
+        if(acAuto){
+            if(celsiusValue > 24) {
+                sendDataToMBed((byte)Devices.ACTemp, (byte)Functions.FUNC2, (byte)Instructions.INST2);
+            } else {
+                sendDataToMBed((byte)Devices.ACTemp, (byte)Functions.FUNC2, (byte)Instructions.INST3);
+            }    
+        }    
     }
 
     // Buffer Action for buffer Thread
@@ -116,7 +154,6 @@ public class IoTController : MonoBehaviour {
         // If, Request the Sensor Data
         if(isReqSensor){
             try{
-                Thread.Sleep(500);
                 string[] readData = sp.ReadLine().Split(",");
                 lightValue = int.Parse(readData[0]);
                 irValue = int.Parse(readData[1]);
