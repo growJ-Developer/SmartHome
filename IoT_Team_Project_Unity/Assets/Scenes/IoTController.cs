@@ -17,11 +17,11 @@ using System.Threading;
 public class IoTController : MonoBehaviour {
     public Thread spThread;
     SerialPort sp = new SerialPort("/dev/tty.usbmodem1403", 115200, Parity.None, 8, StopBits.None);     // Open Serial Port(Mac)
-    //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                      // Open Serial Port(Windows)
+    //SerialPort sp = new SerialPort("COM4", 115200, Parity.None, 8, StopBits.None);                    // Open Serial Port(Windows)
 
     public static byte STX = 0x02;                                           // STX byte data
     public static byte DLE = 0x01;                                           // DLE byte data
-    public static byte ETX = 0x03;                                       // ETX byte data
+    public static byte ETX = 0x03;                                           // ETX byte data
     public static int receiveIndex = 0;                                      // Receive Index
 
     /* Sensor Data */
@@ -37,12 +37,13 @@ public class IoTController : MonoBehaviour {
 
     void Start() {
         sp.Open();                                                          // Open the Serial Port
-        sp.ReadTimeout = 100;
+        sp.ReadTimeout = 50;
+        sp.WriteTimeout = 500;
     }
 
     // Update is called once per frame
     void Update() {
-        getReceiveData();                                                  // Gat data from SerialPort
+        //getReceiveData();                                                  // Gat data from SerialPort
 
         // Control Device Section
         if(Input.GetKey(KeyCode.Q)) {
@@ -51,27 +52,27 @@ public class IoTController : MonoBehaviour {
         }
         if(Input.GetKey(KeyCode.W)) {
             Debug.Log("W");
-            sendDataToMBed((byte)Devices.SPEAKER, (byte)Functions.FUNC1, (byte)Instructions.INST1);
+            sendDataToMBed((byte)Devices.SPEAKER, (byte)Functions.FUNC2, (byte)Instructions.INST2);
         }
     }
 
     // Send data to Mbed
     void sendDataToMBed(byte Device, byte Function, byte Command){
-        // Processing the send data
-        byte[] Protocol = {STX, Device, DLE, Function, DLE, Command, ETX};
-        // Send data to MBed (STX-ETX Format)
-        sp.Write(Protocol, 0, Protocol.Length);              // Send the Protocol Data
+        byte[] sendProtocol = {STX, Device, DLE, Function, DLE, Command, ETX};
+        sp.Write(sendProtocol, 0, sendProtocol.Length);
     }
 
     // Get data from SerialPort
     void getReceiveData(){
         try{
-            string[] readData = sp.ReadLine().Split(",");
+            string msg = sp.ReadLine();
+            string[] readData = msg.Split(",");
 
             lightValue = int.Parse(readData[0]);
             irValue = int.Parse(readData[1]);
             humidityValue = int.Parse(readData[2]);
             celsiusValue = int.Parse(readData[3]);
+            Debug.Log(string.Format("Received Data : {0}", msg));
         } catch(System.TimeoutException){
 
         }
