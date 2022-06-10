@@ -1,3 +1,5 @@
+#include "DigitalOut.h"
+#include "Thread.h"
 #include "mbed.h"
 #include "Dht11.h"
 #include "TextLCD.h"
@@ -34,46 +36,52 @@ TextLCD_I2C lcd(&i2c_lcd, LCD_ADDRESS_LCD, TextLCD::LCD16x2);
 PwmOut LedR(D3);
 PwmOut LedG(D5);
 PwmOut LedB(D6);
+
 DigitalOut rgb1(D7);            // AC Fan Step
 DigitalOut rgb2(D8);            // AC Fan Step
 Servo blind(D2);
-DigitalOut light(D4); 
+DigitalOut light(D4);
+DigitalOut sink(D9);
 
 /* Variable for Aircondition */
-int tempLevel = 3;
-bool acAuto = false;
-float ledRed = 0.5;
-float ledBlue = 0.5;
-
-
-bool isRead = false;
-bool isSend = true;
+int tempLevel = 1;
+float ledStep[] = {0.2, 0.35, 0.5, 0.75, 1.0};
+int powerLevel = 0;
+int powerStepL[] = {1, 1, 0};
+int powerStepR[] = {1, 0, 0};
+int isBlind = 0;
+int isLight = 0;
+int isAC = 0;
+int isTV = 0;
+int isSink = 0;
 
 /* Function Pre-Declation */
-void readSensor() { isRead = true;} 
 void sendSensorData();
-void receiveData();
 void controlDevice(char Device, char Function, char Instruction);
-void acPowerControl(char Function, char Instruction);
-void acTempControl(char Function, char Instruction);
-void setAcPower(float R, float G, float period, int L1, int L2);
-void setAcTemp(float period);
+void controlAC(char Function, char Instruction);
 void controlBlind(char Function, char Instruction);
 void controlLight(char Function, char Instruction);
+void controlTV(char Function, char Instruction);
+void controlSink(char Function, char Instruction);
+void sinkControl();
+void setAcPower();
+void setAcTemp();
 
-const int bufferSize = 256;
+const int bufferSize = 1024;
 char buffer[bufferSize];
 int bufferIndex = 0;
 
 int main() {       
-    lcd.setBacklight(TextLCD::LightOn);
+    /* Initialize the Aircondition */
+    LedR.period(0.005);
+    LedB.period(0.005);
+    setAcTemp();
+    setAcPower();
 
     while (true) {
         char data = pc.getc();
 
         if(data == ACK){
-            lcd.cls();
-            lcd.printf("Req Sensor");
             sendSensorData();
         } else if(data == STX){
             memset(buffer, 0, sizeof(buffer));
@@ -85,132 +93,122 @@ int main() {
     }
 }
 
-/* Get Sensor Data */
-void checkSensorData(){
-    TEMP_SEONSOR.read();
+void sinkControl(){
+    irValue = IR_SENSOR.read_u16();
+    if(irValue < 30000) {
+        sink = 1;
+        isSink = 1;
+    } else {
+        sink = 0;
+        isSink = 0;
+    }
 }
 
 /* Send the Sensor Data using RX-TX */
 void sendSensorData(){
-    pc.printf("%d,%d,%d,%d\r\n", LIGHT_SENSOR.read_u16(), IR_SENSOR.read_u16(), TEMP_SEONSOR.getHumidity(), TEMP_SEONSOR.getCelsius());
+    lcd.cls();
+    TEMP_SEONSOR.read();
+    sinkControl();
+    pc.printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\r\n", LIGHT_SENSOR.read_u16(), IR_SENSOR.read_u16(), TEMP_SEONSOR.getHumidity(), TEMP_SEONSOR.getCelsius(), tempLevel, isBlind, isLight, isAC, isTV, powerLevel, isSink);
 }
 
 /* Control the Device From Serial Data */
 void controlDevice(char Device, char Function, char Instruction){
     lcd.cls();
-
-    if(Device == 0x21) {
-        lcd.printf("TV, ");
-        if(Function == 0x41){
-            lcd.printf("POWER, ");
-            if(Instruction == 0x61){
-                lcd.printf("ON");
-            }
-        }
-    } 
-    if(Device == 0x22) {
-        lcd.printf("SPEAKER, ");
-        if(Function == 0x42){
-            lcd.printf("VOLUME, ");
-            if(Instruction == 0x62){
-                lcd.printf("UP");
-            }
-        }
-    } 
-
-
-    /* Aircondition Controller */
-    if(Device == 0x23)      acPowerControl(Function, Instruction);
-    if(Device == 0x24)      acTempControl(Function, Instruction);
-
-    if(Device == 0x25)      controlBlind(Function, Instruction);
-    if(Device == 0x26)      controlLight(Function,  Instruction);
-
     /* Call the Control Device Function */
+    if(Device == 0x21)      controlTV(Function, Instruction);               // Control the TV
+    if(Device == 0x22)      controlSink(Function, Instruction);             // Control the Sink
+    if(Device == 0x23)      controlAC(Function, Instruction);               // Control the aircondition
+    if(Device == 0x24)      controlBlind(Function, Instruction);            // Control the blind
+    if(Device == 0x25)      controlLight(Function,  Instruction);           // Control the light(mood)
 }
 
-/* Controller for AirCondition Power */
-void acPowerControl(char Function, char Instruction){
-    lcd.printf("AC Power");
-    if(Function == 0x43)    setAcPower(0.5, 0.5, 0.005, 0, 1);
-    if(Function == 0x44)    setAcPower(0.5, 0.5, 0.005, 0, 0);
+void controlTV(char Function, char Instruction){
+    if(Function == 0x41){
+        if(Instruction == 0x61){
+            lcd.setBacklight(TextLCD::LightOff);
+            isTV = 0;
+        }
+        if(Instruction == 0x62){
+            lcd.setBacklight(TextLCD::LightOn);
+            isTV = 1;
+        }
+    }
 }
 
-/* Controller for AirCondition Temperature */
-void acTempControl(char Function, char Instruction){
-    lcd.printf("AC Temp, ");
-    if(Function == 0x42){
+/* Controller for Aircondition */
+void controlAC(char Function, char Instruction){
+    if(Function == 0x41){
+        /* Controll the Power for AC */
+        if(Instruction == 0x61) {
+            powerLevel = 0;
+            isAC = 0;
+        }
         if(Instruction == 0x62) {
-            lcd.printf("Temp Down");
-            if(tempLevel > 1){
-                 ledRed -= 0.25;
-                 ledBlue += 0.25;
-                 tempLevel--;
-            }
-        }
-        if(Instruction == 0x63) {
-            lcd.printf("Temp Up");
-            if(tempLevel < 5){
-                 ledRed += 0.25;
-                 ledBlue -= 0.25;
-                 tempLevel++;
-            }
-        }
+            powerLevel = 1;
+            isAC = 1;
+        }    
+        setAcPower();
     }
-    if(Function == 0x43) {
-        if(tempLevel > 1){
-            ledRed -= 0.25;
-            ledBlue += 0.25;
-            tempLevel--;
-        }
+    if(Function == 0x42){
+        /* Controll the FAN for AC*/
+        if(Instruction == 0x61)     powerLevel = (powerLevel - 1) < 1 ? 1 : powerLevel - 1;
+        if(Instruction == 0x62)     powerLevel = (powerLevel + 1) > 2 ? 2 : powerLevel + 1;
+        setAcPower();
     }
-    if(Function == 0x44){
-        if(tempLevel > 1){
-            ledRed += 0.25;
-            ledBlue -= 0.25;
-            tempLevel++;
-        }
+    if(Function == 0x43){
+        /* Controll the Temperature */
+        if(Instruction == 0x61)     tempLevel = (tempLevel - 1) < 0 ? 0 : tempLevel - 1;
+        if(Instruction == 0x62)     tempLevel = (tempLevel + 1) > 4 ? 4 : tempLevel + 1;
+        setAcTemp();   
     }
-
-    setAcTemp(0.005);
 }
 
-void setAcPower(float R, float G, float period, int L1, int L2) {
-    LedR.write(R);
-    LedB.write(G);
-    LedR.period(period);
-    LedB.period(period);
-    rgb1.write(L1);
-    rgb2.write(L2);
+void setAcPower() {
+    rgb1.write(powerStepL[powerLevel]);
+    rgb2.write(powerStepR[powerLevel]);
 }
 
-void setAcTemp(float period) {
-    LedR.write(ledRed);
-    LedB.write(ledBlue);
-    LedR.period(period);
-    LedB.period(period);
+void setAcTemp() {
+    LedR.write(ledStep[tempLevel]);
+    LedB.write(ledStep[4 - tempLevel]);
 }
 
 /* Controller for Blind */
 void controlBlind(char Function, char Instruction){
-    lcd.printf("Blind Control");
     if(Function == 0x41){
         if(Instruction == 0x61){
             blind.write(180);
+            isBlind = 0;
         } else if(Instruction == 0x62){
             blind.write(0);
+            isBlind = 1;
         }
     }
 }
 
 /* Controller for Light */
 void controlLight(char Function, char Instruction){
-    lcd.printf("Light Control");
     if(Function == 0x41){
         if(Instruction == 0x61){
-            light = 1;
-        } else if(Instruction == 0x62){
             light = 0;
+            isLight = 0;
+        } else if(Instruction == 0x62){
+            light = 1;
+            isLight = 1;
+        }
+    }
+}
+
+void controlSink(char Function, char Instruction){
+    if(Function == 0x41){
+        if(Instruction == 0x61){
+            sink = 0;
+            isSink = 0;
+        }
+        if(Instruction == 0x62){
+            sink = 1;
+            isSink = 1;
         }
     }
 }
