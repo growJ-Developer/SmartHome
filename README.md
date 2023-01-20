@@ -2,28 +2,32 @@
 가정용 스마트홈 제어 프로그램
 
 ### 🗂️ 프로젝트 소개
-2022년 1학기에 수강한<br>
+2022년 1학기에 수강한 IoT임베디드시스템에서 진행한 가정용 스마트홈 제어 프로그램입니다.
+<br>
 
 ### 📆 개발 기간
 * 2022년 11월 1일 ~ 2022년 12월 13일
 
 #### 🙋🏻‍♂️ 멤버 구성
- - 장성용(팀장): 프로젝트 설계, 개발환경 구축, 하드웨어 구성 작업
- - [신요한](https://github.com/tlsdygks): Yolo를 이용한 객체 인식 코드 구성
- - [임성우](https://github.com/imseongwoo): 그리퍼 제어 모듈 구성
- - [정영준](https://github.com/JeongYeongJoon): 인식한 객체를 기반으로 로봇 동작 제어 구성
+ - 장성용(팀장): 프로젝트 설계, I2C Display 제어 모듈 제작
+ - [정영준](https://github.com/JeongYeongJoon): 온습도 제어를 통한 LED 제어
+ - [박윤서](https://github.com/wndrksdl): 조도 센서를 통한 블라인드(Servo Motor) 제어
+ 
 
 #### 🖥️ 개발 환경
- - Master PC: `ROS Melodic(Ubuntu 18.04)`
- - Slave PC: `ROS Melodic(Ubuntu Server 18.04 ARM on Raspberry Pi)`
- - IDE: Qt Creater (Plugin ROS)
- - HW: `Turtlebot3 Waffle Pi`, `Raspberry Pi 3B+`, `Open CR Board`, `LDS-Lidar`, `Gripper`
+ - Slave HW: `F103RB(on MBed OS 5)`
+ - Master HW: `Unity 2D Program`
+ - Sensor: `Light Sensor`, `IR Sensor`, `Temperature Sensor`
+ - Actuator: `Led`, `Servo Motor`, `I2C Display`, `Speaker Module`
+ - IDE: MBed Studio, Unity
 
 #### 🔖 주요 기능
- - 카메라 및 LDS Lidar에 대한 Bringup 작업
- - 제어 토픽에 따른 그리퍼 제어 작업(물체 포획)
- - 하드웨어(로봇 구동체) 제어 작업
+ - 센서를 통한 현재 상태 측정(온도, 조도, 물체 가림 여부)
+ - 측정된 온도와 조도, 가림여부에 따른 각각의 모듈 제어(TV, 에어컨 등)
+ - I2C Display를 통한 제어 상태 출력
+ - Serial 통신을 이용하여 Unity 2D 제어프로그램 기반 제어
 
 ### 🕹️ 동작 화면
-동작 확면 및 사진이 존재하지 않습니다.
+![스크린샷 2023-01-20 오후 1 51 18](https://user-images.githubusercontent.com/74158951/213619767-4bb00a8f-4200-45df-884a-1b4090fa1a2e.png)
+
 
