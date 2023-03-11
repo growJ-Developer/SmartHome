@@ -29,5 +29,6 @@
 
 ### 🕹️ 동작 화면
 ![스크린샷 2023-01-20 오후 1 51 18](https://user-images.githubusercontent.com/74158951/213619767-4bb00a8f-4200-45df-884a-1b4090fa1a2e.png)
-
+![KakaoTalk_Photo_2023-03-11-20-12-38](https://user-images.githubusercontent.com/74158951/224481056-4f981b1c-1ac9-4161-9edd-7bc95b558b60.jpeg)
+![KakaoTalk_Photo_2023-03-11-20-12-50](https://user-images.githubusercontent.com/74158951/224481058-c80d84e5-0a18-4bae-a5ad-79bb6b13e24f.jpeg)
 
